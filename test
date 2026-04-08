@@ -1,0 +1,176 @@
+Oui 👍 et même mieux : **ton script actuel GitHub Actions est déjà du Bash** → tu peux presque le réutiliser tel quel sur Windows (via Git Bash ou WSL).
+
+Je te fais une version **propre, locale, autonome**, avec :
+
+* chargement `.env`
+* export Monaco
+* purge **N-5**
+* compatible Windows (Git Bash / WSL)
+
+---
+
+# 📁 Structure
+
+```bash
+dynatrace-monaco-export/
+│
+├── .env
+├── manifest.yaml
+├── run.sh
+└── projects/
+```
+
+---
+
+# ⚙️ 1. `.env`
+
+```bash
+DT_API_TOKEN=xxxx
+DT_ENVIRONMENT_URL=https://xxxx.live.dynatrace.com
+```
+
+---
+
+# 🐚 2. Script `run.sh`
+
+👉 version fidèle à ton GitHub Actions + modif N-5
+
+```bash
+#!/bin/bash
+
+echo "=== Dynatrace Monaco Export START ==="
+
+# === LOAD ENV ===
+export $(grep -v '^#' .env | xargs)
+
+PROJECT_NAME="dynatrace-monaco-export"
+OUTPUT_DIR="projects"
+
+# === EXPORT ===
+echo "=== Export Dynatrace Configuration ==="
+
+monaco download \
+  --manifest manifest.yaml \
+  --environment prd \
+  --project $PROJECT_NAME \
+  --output-folder $OUTPUT_DIR \
+  --verbose
+
+if [ $? -ne 0 ]; then
+  echo "ERROR: Monaco export failed"
+  exit 1
+fi
+
+# === PURGE OLD EXPORTS (KEEP 5) ===
+cd $OUTPUT_DIR || exit
+
+echo "=== Purge old exports (keep 5) ==="
+
+# --- EXPORT DIRS ---
+EXPORT_DIRS=$(ls -d dynatrace-monaco-export_prd_* 2>/dev/null || true)
+COUNT_DIRS=$(echo "$EXPORT_DIRS" | grep -v '^$' | wc -l)
+NUM_TO_DELETE_DIRS=$((COUNT_DIRS - 5))
+
+if [ $NUM_TO_DELETE_DIRS -gt 0 ]; then
+  echo "Found $COUNT_DIRS export directories. Purging $NUM_TO_DELETE_DIRS oldest..."
+  echo "$EXPORT_DIRS" | head -n $NUM_TO_DELETE_DIRS | xargs -r rm -rf
+else
+  echo "No old export directories to purge (found $COUNT_DIRS)"
+fi
+
+# --- MANIFEST FILES ---
+MANIFEST_FILES=$(ls -1 manifest_*.yaml 2>/dev/null || true)
+COUNT_FILES=$(echo "$MANIFEST_FILES" | grep -v '^$' | wc -l)
+NUM_TO_DELETE_FILES=$((COUNT_FILES - 5))
+
+if [ $NUM_TO_DELETE_FILES -gt 0 ]; then
+  echo "Found $COUNT_FILES manifest backups. Purging $NUM_TO_DELETE_FILES oldest..."
+  echo "$MANIFEST_FILES" | head -n $NUM_TO_DELETE_FILES | xargs -r rm -f
+else
+  echo "No old manifest backups to purge (found $COUNT_FILES)"
+fi
+
+echo "=== Dynatrace Monaco Export END ==="
+```
+
+---
+
+# ▶️ 3. Exécution
+
+Dans Git Bash / WSL :
+
+```bash
+chmod +x run.sh
+./run.sh
+```
+
+---
+
+# ⏱️ 4. Planification (Windows)
+
+⚠️ Bash ≠ natif Windows → tu dois passer par Git Bash
+
+### Programme :
+
+```bash
+C:\Program Files\Git\bin\bash.exe
+```
+
+### Arguments :
+
+```bash
+-c "/c/chemin/dynatrace-monaco-export/run.sh"
+```
+
+---
+
+# ✅ Résultat
+
+✔ Script 100% équivalent à ton GitHub Actions
+✔ Réutilisation du Bash existant
+✔ Fonctionne en local
+✔ purge **N-5**
+✔ simple et robuste
+
+---
+
+# 💡 Astuces importantes
+
+### 🔹 Vérifier Monaco
+
+```bash
+monaco --version
+```
+
+---
+
+### 🔹 Logs (recommandé)
+
+```bash
+./run.sh >> log.txt 2>&1
+```
+
+---
+
+### 🔹 Alternative plus propre (WSL)
+
+Si tu veux du vrai Linux :
+
+👉 installe WSL → meilleur que Git Bash pour cron
+
+---
+
+# 🚀 Conclusion
+
+👉 **Oui, Bash est le plus simple dans ton cas**
+👉 C’est littéralement ton script GitHub Actions adapté au local
+
+---
+
+Si tu veux, je peux te faire :
+
+* 🔁 version avec `cron` sous WSL (plus propre que Task Scheduler)
+* 📦 version multi-environnements
+* ☁️ upload automatique (S3 / Azure / Git)
+
+Dis-moi 👍
