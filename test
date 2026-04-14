@@ -1,128 +1,49 @@
-#!/bin/bash
-
-echo "=== Load namespace from site.json ==="
-
-NAMESPACE=$(jq -r '.namespace' site.json)
-
-if [ -z "$NAMESPACE" ]; then
-  echo "ERROR: namespace not found"
-  exit 1
-fi
-
-echo "Namespace: $NAMESPACE"
-
-export NAMESPACE
-
-echo "=== Deploy with Monaco ==="
-
-monaco deploy manifest.yaml \
-  --environment prd \
-  --verbose
-
-
-
-manifst:
-
-manifestVersion: "1.0"
-
-projects:
-  - name: mz
-    path: projects/mz
-
-environmentGroups:
-  - name: default
-    environments:
-      - name: prd
-        url:
-          type: environment
-          value: DT_ENVIRONMENT_URL
-        auth:
-          token:
-            type: environment
-            value: DT_API_TOKEN
-
-
-config yaml
-
-configs:
-  - id: management-zone
-    config:
-      name: "mz-${NAMESPACE}"
-      template: management-zone.json
-    type:
-      settings:
-        schema: builtin:management-zones
-
-json
-
-{
-  "name": "mz-${NAMESPACE}",
-  "rules": [
-    {
-      "type": "SERVICE",
-      "enabled": true,
-      "propagationTypes": ["SERVICE_TO_HOST"],
-      "conditions": [
-        {
-          "key": {
-            "attribute": "SERVICE_TAGS"
-          },
-          "comparisonInfo": {
-            "type": "TAG",
-            "operator": "EQUALS",
-            "value": {
-              "context": "CONTEXTLESS",
-              "key": "kubernetes.namespace",
-              "value": "${NAMESPACE}"
-            }
-          }
-        }
-      ]
-    },
-    {
-      "type": "KUBERNETES_CLUSTER",
-      "enabled": true,
-      "conditions": [
-        {
-          "key": {
-            "attribute": "KUBERNETES_NAMESPACE_NAME"
-          },
-          "comparisonInfo": {
-            "type": "STRING",
-            "operator": "EQUALS",
-            "value": "${NAMESPACE}"
-          }
-        }
-      ]
-    }
-  ]
-}
-
-{
-  "type": "SERVICE",
-  "enabled": true,
-  "entitySelector": "type(SERVICE),tag(kubernetes.namespace:${NAMESPACE})"
-}
-
-------
-
-Parfait — on va faire la version la plus simple possible, 100% Monaco, sans script, sans JSON externe, juste avec :
-
-👉 parameters dans Monaco
-👉 un entitySelector dynamique
-👉 une Management Zone
-
-📁 Structure minimale
+tructure
 dynatrace-monaco-mz/
 │
+├── deploy.sh
 ├── manifest.yaml
 └── projects/
     └── mz/
         ├── config.yaml
         └── management-zone.json
-⚙️ 1. manifest.yaml
+🐚 1. deploy.sh (COMPLET)
+#!/bin/bash
 
-👉 on injecte directement le paramètre ici
+echo "=== Dynatrace MZ Deploy START ==="
+
+# 🔐 Variables Dynatrace
+export DT_ENVIRONMENT_URL="https://xxxx.live.dynatrace.com"
+export DT_API_TOKEN="dt0c01.xxxxxx"
+
+# 🎯 Namespace
+export NAMESPACE="packaging-api"
+
+echo "Env URL: $DT_ENVIRONMENT_URL"
+echo "Namespace: $NAMESPACE"
+
+# Vérif monaco
+if ! command -v monaco &> /dev/null
+then
+  echo "ERROR: monaco not found"
+  exit 1
+fi
+
+echo "=== Deploy ==="
+
+monaco deploy manifest.yaml \
+  --environment prd \
+  --verbose
+
+if [ $? -ne 0 ]; then
+  echo "ERROR: Deploy failed"
+  exit 1
+fi
+
+echo "=== DONE ==="
+📄 2. manifest.yaml
+
+👉 ici on lit les variables d’environnement
 
 manifestVersion: "1.0"
 
@@ -141,22 +62,15 @@ environmentGroups:
           token:
             type: environment
             value: DT_API_TOKEN
-
-parameters:
-  NAMESPACE: "my-app-prod"
-📦 2. config.yaml
+⚙️ 3. config.yaml
 configs:
   - id: mz
     config:
-      name: "mz-${NAMESPACE}"
       template: management-zone.json
     type:
       settings:
         schema: builtin:management-zones
-🧠 3. management-zone.json
-
-👉 avec ton entitySelector exact
-
+🧠 4. management-zone.json
 {
   "name": "mz-${NAMESPACE}",
   "rules": [
@@ -168,31 +82,54 @@ configs:
   ]
 }
 ▶️ Exécution
-monaco deploy manifest.yaml \
-  --environment prd \
-  --verbose
+chmod +x deploy.sh
+./deploy.sh
+⚠️ Sécurité (IMPORTANT)
+
+👉 Évite de laisser le token en dur si tu commits
+
+Option plus propre :
+export DT_API_TOKEN=$DT_API_TOKEN
+
+ou .env :
+
+source .env
 ✅ Résultat
 
-👉 Monaco crée automatiquement :
+Avec :
 
-🎯 Management Zone : mz-my-app-prod
-🔍 règle basée sur :
-type(SERVICE),tag(kubernetes.namespace:my-app-prod)
-💡 Pourquoi c’est la meilleure version simple
+NAMESPACE=packaging-api
 
-✔ aucun script
-✔ aucun parsing JSON
-✔ full declaratif
-✔ ultra lisible
-✔ parfait pour Git / CI/CD
+👉 Dynatrace crée :
 
-🚀 Si tu veux aller juste un cran au-dessus
+🎯 mz-packaging-api
+🔍 règle basée sur ton namespace
+🚀 Bonus (propre pro)
 
-Je peux ensuite te faire :
+Tu peux faire :
 
-🔁 multi-namespace dans le même manifest
-📦 génération automatique de plusieurs MZ
-🎯 ajout HOST / PROCESS / K8S rules
-🧪 validation avant déploiement
+export NAMESPACE=${1:-packaging-api}
+
+👉 usage :
+
+./deploy.sh payment-api
+🧾 Conclusion
+
+👉 Oui, tout peut être exporté dans le script
+👉 Monaco récupère automatiquement :
+
+URL
+Token
+Namespace
+
+✔ simple
+✔ autonome
+✔ prêt pour CI/CD
+
+Si tu veux, je peux te faire :
+
+🔐 version sécurisée (Vault / Azure KeyVault)
+🔁 multi-environnements (dev / prod)
+☸️ auto-détection namespace Kubernetes
 
 Dis-moi 👍
