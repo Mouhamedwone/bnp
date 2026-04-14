@@ -1,2 +1,25 @@
-curl -X GET "$DT_ENVIRONMENT_URL/api/config/v1/managementZones" \
-  -H "Authorization: Api-Token $DT_API_TOKEN"
+{
+  "name": "mz-test1",
+  "rules": [
+    {
+      "type": "SERVICE",
+      "enabled": true,
+      "conditions": [
+        {
+          "key": {
+            "attribute": "SERVICE_TAGS"
+          },
+          "comparisonInfo": {
+            "type": "TAG",
+            "operator": "EQUALS",
+            "value": {
+              "context": "CONTEXTLESS",
+              "key": "kubernetes.namespace",
+              "value": "packaging-api"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
